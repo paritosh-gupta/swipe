@@ -26,6 +26,10 @@
 %include "carrays.i"
 %array_functions(double, doublea);
 
+%include "carrays.i"
+%array_functions(double, doubleArray);
+
+
 %module swipe %{
 #define SWIG_FILE_WITH_INIT
 #include "swipe.h"
@@ -35,7 +39,7 @@ typedef struct {
     int x; 
     double* v; } vector;
 
-vector pyswipe(char[], double, double, double, double);
+vector pyswipe(double *,int,int, double, double, double, double);
 
 %pythoncode %{
 import numpy as NP
@@ -74,12 +78,13 @@ class Swipe(object):
     Wrapper class representing a SWIPE' pitch extraction
     """
 
-    def __init__(self, path, pmin=100., pmax=600., st=.3, dt=.001, 
-                                                          mel=False):
+    def __init__(self,data,length,samplerate=16000, pmin=100., pmax=600., st=.3, dt=.001,show_nan=True,mel=False):
         """
         Class constructor:
 
-        path = either a file object pointing to a wav file, or a string path
+        data = Float array containing data
+        length = length of data
+        samplerate = samplerate of the data
         pmin = minimum frequency in Hz
         pmax = maximum frequency in Hz
         st = strength threshold (must be between [0.0, 1.0])
@@ -87,12 +92,15 @@ class Swipe(object):
         show_nan = if True, voiceless intervals are returned, marked as nan.
         """
         # Get Python path, just in case someone passed a file object
-        f = path.name if hasattr(path, 'read') else path
+        # f = path.name if hasattr(path, 'read') else path
         # check the path, quickly
-        if not access(f, R_OK): 
-            raise(IOError('File "{0}" not found'.format(f)))
+        # if not access(f, R_OK): 
+        #     raise(IOError('File "{0}" not found'.format(f)))
         # Obtain the vector itself
-        P = pyswipe(f, pmin, pmax, st, dt)
+        d = new_doubleArray(length)
+        for i in range(0,length):        # Set some values   
+            doubleArray_setitem(d,i,data[i])
+        P = pyswipe(d,length,samplerate, pmin, pmax, st, dt)
         # get function
         conv = None
         if mel: 
@@ -107,11 +115,11 @@ class Swipe(object):
             raise(ValueError('Failed to read audio'))
         for i in range(P.x):
             val = doublea_getitem(P.v, i)
-            if not isnan(val):
-                self.t.append(tt)
-                self.p.append(conv(val))
+            #if not isnan(val or show_nan):
+            self.t.append(tt)
+            self.p.append(conv(val))
             tt += dt
-
+        delete_doubleArray(d)  
     def __str__(self):
         return '<Swipe pitch track with {0} points>'.format(len(self.t))
 
